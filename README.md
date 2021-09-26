@@ -1,16 +1,12 @@
-﻿# cryptopunk nft generator
-How to generate 800,000 crypto punks using javascript
+﻿# nft generator
+Generate NFT LIMITED combinations (collectibles) with given traits (support rarity table)
 
 [Full instruction](https://dev.to/victorquanlam/generate-879-120-cryptopunk-nfts-with-javascript-nodejs-command-line-app-step-by-step-10hp)
 
-## install canvas package
+## installation
 
 ```` npm install ````
 
-## run index.js or build
-
-````node index.js ````
-
-## limit outputs eg: 100 images
+## limit outputs eg: 100 combinations
 
 ````node index.js 100````

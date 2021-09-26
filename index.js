@@ -1,60 +1,61 @@
 const fs = require("fs");
-const { createCanvas, loadImage } = require("canvas");
+const {createCanvas, loadImage} = require("canvas");
 const console = require("console");
 
 const imageFormat = {
-    width: 24,
-    height: 24
+  width: 24,
+  height: 24
 };
 
 const dir = {
-  traitTypes : `./layers/trait_types`,
+  traitTypes: `./layers/trait_types`,
   outputs: `./outputs`,
   background: `./layers/background`,
 }
 
+const priorities = ['punks', 'top', 'beard'];
+
+const COLLECTIBLE_NAME = 'punk';
 let totalOutputs = 0;
 
 const canvas = createCanvas(imageFormat.width, imageFormat.height);
 const ctx = canvas.getContext("2d");
 
-const priorities = ['punks','top','beard'];
-
 const main = async (numberOfOutputs) => {
   const traitTypesDir = dir.traitTypes;
-  // register all the traits 
+  // register all the traits
   const types = fs.readdirSync(traitTypesDir);
 
   // set all priotized layers to be drawn first. for eg: punk type, top... You can set these values in the priorities array in line 21
-  const traitTypes = priorities.concat(types.filter(x=> !priorities.includes(x)))
-                      .map(traitType => (
-                        fs.readdirSync(`${traitTypesDir}/${traitType}/`)
-                      .map(value=> {
-                          return {trait_type: traitType, value: value}
-                        }).concat({trait_type: traitType, value: 'N/A'})
-                      ));
+  const traitTypes = priorities.concat(types.filter(x => !priorities.includes(x)))
+    .map(traitType => (
+      fs.readdirSync(`${traitTypesDir}/${traitType}/`)
+        .map(value => {
+          return {trait_type: traitType, value: value}
+        }).concat({trait_type: traitType, value: 'N/A'})
+    ));
 
   const backgrounds = fs.readdirSync(dir.background);
 
   // trait type avail for each punk
-  const combinations = allPossibleCases(traitTypes,numberOfOutputs)
-  
-    for (var n = 0; n < combinations.length; n++) {
-      const randomBackground = backgrounds[Math.floor(Math.random() * backgrounds.length)]
-      await drawImage(combinations[n] , randomBackground, n);
-    }
+  const combinations = allPossibleCases(traitTypes, numberOfOutputs)
+
+  for (let n = 0; n < combinations.length; n++) {
+    const randomBackground = backgrounds[Math.floor(Math.random() * backgrounds.length)]
+    await drawImage(combinations[n], randomBackground, n);
+  }
 };
 
 const recreateOutputsDir = () => {
   if (fs.existsSync(dir.outputs)) {
-    fs.rmdirSync(dir.outputs, { recursive: true });
+    fs.rmdirSync(dir.outputs, {recursive: true});
   }
   fs.mkdirSync(dir.outputs);
   fs.mkdirSync(`${dir.outputs}/metadata`);
-  fs.mkdirSync(`${dir.outputs}/punks`);
+  fs.mkdirSync(`${dir.outputs}/${COLLECTIBLE_NAME}`);
 };
 
-const allPossibleCases = (arraysToCombine, max) => {
+const allPossibleCases = (arraysToCombine, numberOfOutputs) => {
   const divisors = [];
   let permsCount = 1;
 
@@ -63,62 +64,58 @@ const allPossibleCases = (arraysToCombine, max) => {
     permsCount *= (arraysToCombine[i].length || 1);
   }
 
-
-  if(!!max && max>0) {
-    console.log(max);
-    permsCount = max;
-  }
-
-  totalOutputs = permsCount;
-
-
   const getCombination = (n, arrays, divisors) => arrays.reduce((acc, arr, i) => {
-      acc.push(arr[Math.floor(n / divisors[i]) % arr.length]);
-      return acc;
+    acc.push(arr[Math.floor(n / divisors[i]) % arr.length]);
+    return acc;
   }, []);
 
-  const combinations = [];
+  const allCombinations = [];
   for (let i = 0; i < permsCount; i++) {
-      combinations.push(getCombination(i, arraysToCombine, divisors));
+    allCombinations.push(getCombination(i, arraysToCombine, divisors));
+  }
+
+  totalOutputs = Math.min(allCombinations.length, numberOfOutputs)
+  let combinations = []
+  for (let i = 0; i < totalOutputs; i++) {
+    const pickedCombinationIndex = Math.floor(Math.random() * allCombinations.length)
+    combinations = combinations.concat(allCombinations.splice(pickedCombinationIndex, 1))
   }
 
   return combinations;
-
-  return [];
 };
 
 
-const drawImage= async (traitTypes, background, index) => {
+const drawImage = async (traitTypes, background, index) => {
   // draw background
   const backgroundIm = await loadImage(`${dir.background}/${background}`);
-  
-  ctx.drawImage(backgroundIm,0,0,imageFormat.width,imageFormat.height);
+
+  ctx.drawImage(backgroundIm, 0, 0, imageFormat.width, imageFormat.height);
 
   //'N/A': means that this punk doesn't have this trait type
-  const drawableTraits = traitTypes.filter(x=> x.value !== 'N/A')
+  const drawableTraits = traitTypes.filter(x => x.value !== 'N/A')
   for (let index = 0; index < drawableTraits.length; index++) {
-      const val = drawableTraits[index];
-      const image = await loadImage(`${dir.traitTypes}/${val.trait_type}/${val.value}`);
-      ctx.drawImage(image,0,0,imageFormat.width,imageFormat.height);
+    const val = drawableTraits[index];
+    const image = await loadImage(`${dir.traitTypes}/${val.trait_type}/${val.value}`);
+    ctx.drawImage(image, 0, 0, imageFormat.width, imageFormat.height);
   }
 
-  console.log(`Progress: ${index+1}/ ${totalOutputs}`)
+  console.log(`Progress: ${index + 1}/ ${totalOutputs}`)
 
   // save metadata
   fs.writeFileSync(
-    `${dir.outputs}/metadata/${index+1}.json`,
+    `${dir.outputs}/metadata/${index + 1}.json`,
     JSON.stringify({
-      name: `punk ${index}`,
+      name: `${COLLECTIBLE_NAME} ${index}`,
       attributes: drawableTraits
     }),
-    function(err){
-      if(err) throw err;
+    function (err) {
+      if (err) throw err;
     }
   )
 
-  // save image 
+  // save image
   fs.writeFileSync(
-    `${dir.outputs}/punks/${index+1}.png`, 
+    `${dir.outputs}/${COLLECTIBLE_NAME}/${index + 1}.png`,
     canvas.toBuffer("image/png")
   );
 }
@@ -127,5 +124,11 @@ const drawImage= async (traitTypes, background, index) => {
 (() => {
   recreateOutputsDir();
 
-  main(process.argv[2]);
+  const numOfCombinations = parseInt(process.argv[2])
+
+  if (!numOfCombinations || numOfCombinations <= 0) {
+    return console.log('error: no number of combinations specified')
+  }
+
+  main(numOfCombinations);
 })();
